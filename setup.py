@@ -14,10 +14,8 @@ setup(
 
             # Specify which files are included with the distribution
             'include_patterns': [
-                '**/*.png',
-                '**/*.jpg',
-                '**/*.egg',
-                '**/*.obj'
+                'models/**',
+                'models/plane/piper_pa18.obj'
             ],
 
             # Platforms that we're building for.
@@ -29,7 +27,10 @@ setup(
             'plugins': [
                 'pandagl',
                 'p3openal_audio',
+                'p3assimp'
             ],
+
+            'include_modules': {'*': ['scipy._lib.messagestream', 'scipy.spatial.transform._rotation_groups']}
         }
     }
 )
