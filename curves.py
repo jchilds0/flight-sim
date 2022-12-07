@@ -1,7 +1,6 @@
 from scipy.integrate import odeint
 import numpy as np
-from matplotlib import pyplot as plt
-from math import atan, pi, fabs
+from math import atan, pi
 
 
 def frenet_serre(y, t, kappa, tau):

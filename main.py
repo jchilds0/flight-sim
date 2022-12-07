@@ -1,7 +1,6 @@
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task.TaskManagerGlobal import taskMgr
-from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import Vec3, NodePath, PandaNode, TextNode
 from math import pi
 from curves import solve_frenet_serre, tanjent_to_hpr
