@@ -15,7 +15,6 @@ setup(
             # Specify which files are included with the distribution
             'include_patterns': [
                 'models/**',
-                'models/plane/piper_pa18.obj'
             ],
 
             # Platforms that we're building for.

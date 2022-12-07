@@ -1,7 +1,7 @@
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task.TaskManagerGlobal import taskMgr
-from panda3d.core import Vec3, NodePath, PandaNode, TextNode
+from panda3d.core import Vec3, NodePath, PandaNode, TextNode, GeoMipTerrain
 from math import pi
 from curves import solve_frenet_serre, tanjent_to_hpr
 
@@ -14,10 +14,31 @@ class MyApp(ShowBase):
         ShowBase.__init__(self)
 
         # Landscape
-        self.environ = self.loader.loadModel("models/world")
-        self.environ.reparentTo(render)
+        # Set up the GeoMipTerrain
+        terrain = GeoMipTerrain("myDynamicTerrain")
+        terrain.setHeightfield("models/terrain/Flow-Tertiary.tif")
 
-        self.environ.setPos(0, 0, -30)
+        # Set terrain properties
+        terrain.setBlockSize(128)
+        terrain.setNear(4)
+        terrain.setFar(10)
+        terrain.setFocalPoint(base.camera)
+
+        # Store the root NodePath for convenience
+        root = terrain.getRoot()
+        root.reparentTo(render)
+        root.setSz(50)
+
+        # Generate it.
+        terrain.generate()
+        terrain.setColorMap("models/terrain/Texture/Normal.tif")
+
+        # Add a task to keep updating the terrain
+        def updateTerrain(task):
+            terrain.update()
+            return task.cont
+
+        taskMgr.add(updateTerrain, "updateTer")
 
         # Plane Model
         self.plane = loader.loadModel("models/plane/piper_pa18.obj")
@@ -30,8 +51,8 @@ class MyApp(ShowBase):
         self.time = 0
         self.tau = 0
         self.kappa = 0
-        self.plane_pos = (0, 0, 0)
-        self.plane_T = [(0, -1, 0), (0, -1, 0)]
+        self.plane_pos = (100, 100, 100)
+        self.plane_T = [(0, 1, 0), (0, 1, 0)]
         self.plane_N = [(1, 0, 0), (1, 0, 0)]
         self.plane_B = [(0, 0, 1), (0, 0, 1)]
 
@@ -64,10 +85,10 @@ class MyApp(ShowBase):
         self.accept("w-up", self.updateKeyMap, ["tor+", False])
         self.accept("s", self.updateKeyMap, ["tor-", True])
         self.accept("s-up", self.updateKeyMap, ["tor-", False])
-        self.accept("a", self.updateKeyMap, ["curv+", True])
-        self.accept("a-up", self.updateKeyMap, ["curv+", False])
-        self.accept("d", self.updateKeyMap, ["curv-", True])
-        self.accept("d-up", self.updateKeyMap, ["curv-", False])
+        self.accept("a", self.updateKeyMap, ["curv-", True])
+        self.accept("a-up", self.updateKeyMap, ["curv-", False])
+        self.accept("d", self.updateKeyMap, ["curv+", True])
+        self.accept("d-up", self.updateKeyMap, ["curv+", False])
 
         self.updateTask = taskMgr.add(self.updateCurvTor, "updatePos")
         self.updateTaskText = taskMgr.add(self.updateText, "updateText")
