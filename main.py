@@ -20,30 +20,10 @@ class MyApp(ShowBase):
 
         # Landscape
         # Set up the GeoMipTerrain
-        terrain = GeoMipTerrain("myDynamicTerrain")
-        terrain.setHeightfield("models/terrain/Flow-Tertiary.tif")
+        self.terrain = GeoMipTerrain("myDynamicTerrain")
+        self.root = self.terrain.getRoot()
 
-        # Set terrain properties
-        terrain.setBlockSize(128)
-        terrain.setNear(40)
-        terrain.setFar(100)
-        terrain.setFocalPoint(base.camera)
-
-        # Store the root NodePath for convenience
-        root = terrain.getRoot()
-        root.reparentTo(render)
-        root.setSz(50)
-        terrain.setColorMap("models/terrain/Texture/normal.tif")
-
-        # Generate it.
-        terrain.generate()
-
-        # Add a task to keep updating the terrain
-        def updateTerrain(task):
-            terrain.update()
-            return task.cont
-
-        taskMgr.add(updateTerrain, "updateTer")
+        self.__init_terrain()
 
         # Skybox
         self.skysphere = loader.loadModel("SkySphere.bam")
@@ -54,27 +34,12 @@ class MyApp(ShowBase):
 
         # Plane Model
         self.plane = loader.loadModel("models/plane/piper_pa18.obj")
-        self.plane.reparentTo(render)
-        planeTS = TextureStage('ts')
-        planeDiffuse = loader.loadTexture("models/plane/textures/piper_diffuse.jpg")
-        planeBump = loader.loadTexture("models/plane/textures/piper_bump.jpg")
-        planeRefl = loader.loadTexture("models/plane/textures/piper_refl.jpg")
-        self.plane.setTexture(planeTS, planeDiffuse)
 
-        self.plane.setPos(0, 30, 0)
-        self.plane.setHpr(0, 90, 0)
-        self.time = 0
-        self.tau = 0
-        self.kappa = 0
-        self.plane_pos = (100, 100, 100)
-        self.plane_T = [(0, 1, 0), (0, 1, 0)]
-        self.plane_N = [(1, 0, 0), (1, 0, 0)]
-        self.plane_B = [(0, 0, 1), (0, 0, 1)]
+        self.__init_plane()
 
         # Text Nodes
         self.text = {
             'Pos': TextNode('pos'),
-            'GetPos': TextNode('get_pos'),
             'Tanjent': TextNode('tanjent'),
             'Normal': TextNode('normal'),
             'Binormal': TextNode('binormal'),
@@ -106,7 +71,6 @@ class MyApp(ShowBase):
         self.accept("d-up", self.updateKeyMap, ["curv+", False])
 
         self.updateTask = taskMgr.add(self.updateCurvTor, "updatePos")
-        self.updateTaskText = taskMgr.add(self.updateText, "updateText")
 
     def __init_text(self):
         lst = list(self.text.items())
@@ -118,17 +82,55 @@ class MyApp(ShowBase):
             self.text[node].setScale(0.07)
             self.text[node].setPos(-1.6, 0, -0.3 - i / 10)
 
+        self.updateTaskText = taskMgr.add(self.updateText, "updateText")
+
+    def __init_terrain(self):
+        self.terrain.setHeightfield("models/terrain/heightmap.png")
+
+        # Set terrain properties
+        self.terrain.setBlockSize(128)
+        self.terrain.setNear(40)
+        self.terrain.setFar(100)
+        self.terrain.setFocalPoint(base.camera)
+
+        # Store the root NodePath for convenience
+        self.root.reparentTo(render)
+        terrainNormal = loader.loadTexture("models/terrain/normal.png")
+        self.root.setTexture(terrainNormal)
+        self.root.setSz(50)
+
+        # Generate it.
+        self.terrain.generate()
+        taskMgr.add(self.updateTerrain, "updateTer")
+
+    def __init_plane(self):
+        self.plane.reparentTo(render)
+        planeTS = TextureStage('ts')
+        planeDiffuse = loader.loadTexture("models/plane/textures/piper_diffuse.jpg")
+        planeBump = loader.loadTexture("models/plane/textures/piper_bump.jpg")
+        planeRefl = loader.loadTexture("models/plane/textures/piper_refl.jpg")
+        self.plane.setTexture(planeTS, planeDiffuse)
+
+        self.plane.setPos(100, 100, 100)
+        self.plane.setHpr(0, 90, 0)
+        self.time = 0
+        self.tau = 0
+        self.kappa = 0
+        self.plane_T = (0, 1, 0)
+        self.plane_N = (1, 0, 0)
+        self.plane_B = (0, 0, 1)
+
     def skysphereTask(self, task):
         self.skysphere.setPos(base.camera, 0, 0, 0)
         return task.cont
 
     def updateKeyMap(self, controlName, controlState):
-        self.time = 0
-        self.plane_pos = self.plane.getPos()
-        self.plane_T[1] = self.plane_T[0]
-        self.plane_N[1] = self.plane_N[0]
-        self.plane_B[1] = self.plane_B[0]
         self.keyMap[controlName] = controlState
+
+    # Add a task to keep updating the terrain
+    def updateTerrain(self, task):
+        self.terrain.update()
+        return task.cont
 
     def updateDefault(self, task):
         """ Default movement """
@@ -167,27 +169,26 @@ class MyApp(ShowBase):
         if self.keyMap["curv-"]:
             self.kappa -= dt * self.SCALE
 
-        sol = solve_frenet_serre(self.plane_pos, self.time + 1, self.plane_T[1],
-                                 self.plane_N[1], self.plane_B[1], self.kappa, self.tau)
+        sol = solve_frenet_serre(self.plane.getPos(), self.plane_T,
+                                 self.plane_N, self.plane_B, self.kappa, self.tau)
 
-        self.plane.setPos(sol[self.time, 0], sol[self.time, 1], sol[self.time, 2])
-        self.plane_T[0] = (sol[self.time, 3], sol[self.time, 4], sol[self.time, 5])
-        self.plane_N[0] = (sol[self.time, 6], sol[self.time, 7], sol[self.time, 8])
-        self.plane_B[0] = (sol[self.time, 9], sol[self.time, 10], sol[self.time, 11])
+        index = 1
+        self.plane.setPos(sol[index, 0], sol[index, 1], sol[index, 2])
+        self.plane_T = (sol[index, 3], sol[index, 4], sol[index, 5])
+        self.plane_N = (sol[index, 6], sol[index, 7], sol[index, 8])
+        self.plane_B = (sol[index, 9], sol[index, 10], sol[index, 11])
 
-        self.plane.setHpr(tanjent_to_hpr(self.plane_T[0], self.plane_N[0], self.plane_B[0]))
+        self.plane.setHpr(tanjent_to_hpr(self.plane_T, self.plane_N, self.plane_B))
         self.camera.setPos(self.plane.getPos() - self.planeDir(20) + Vec3(0, 0, 10))
         self.camera.lookAt(self.floater)
-        self.time += 1
 
         return task.cont
 
     def planeDir(self, scale):
-        return Vec3(scale * self.plane_T[0][0], scale * self.plane_T[0][1], scale * self.plane_T[0][2])
+        return Vec3(scale * self.plane_T[0], scale * self.plane_T[1], scale * self.plane_T[2])
 
     def updateText(self, task):
-        pos_str = "Plane Pos: " + str(self.plane_pos)
-        get_pos_str = "Get Pos: " + str(self.plane.getPos())
+        pos_str = "Plane Pos: " + str(self.plane.getPos())
         tanjent_str = "Tanjent: " + self.strVector(self.plane_T)
         normal_str = "Normal: " + self.strVector(self.plane_N)
         binormal_str = "Binormal: " + self.strVector(self.plane_B)
@@ -195,7 +196,6 @@ class MyApp(ShowBase):
         tau_str = "Torsion: " + str(round(self.tau, 4))
 
         self.text['Pos'].setText(pos_str)
-        self.text['GetPos'].setText(get_pos_str)
         self.text['Tanjent'].setText(tanjent_str)
         self.text['Normal'].setText(normal_str)
         self.text['Binormal'].setText(binormal_str)
@@ -207,12 +207,9 @@ class MyApp(ShowBase):
     @staticmethod
     def strVector(vector):
         digits = 2
-        vec1 = "(" + str(round(vector[0][0], digits)) + ", " + str(round(vector[0][1], digits)) \
-               + ", " + str(round(vector[0][2], digits)) + ")"
-        vec2 = "(" + str(round(vector[1][0], digits)) + ", " + str(round(vector[1][1], digits)) \
-               + ", " + str(round(vector[1][2], digits)) + ")"
 
-        return "[" + vec1 + ", " + vec2 + "]"
+        return "(" + str(round(vector[0], digits)) + ", " + str(round(vector[1], digits)) \
+               + ", " + str(round(vector[2], digits)) + ")"
 
 app = MyApp()
 app.run()

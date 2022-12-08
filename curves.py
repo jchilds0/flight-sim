@@ -34,7 +34,7 @@ def frenet_serre(y, t, kappa, tau):
     ]
 
 
-def solve_frenet_serre(p0, s, t0, n0, b0, kappa, tau):
+def solve_frenet_serre(p0, t0, n0, b0, kappa, tau):
     """
     Solves the Frenet Serre equations to calculate a curve with
     the given inital conditions, curvature and torsion.'
@@ -57,7 +57,7 @@ def solve_frenet_serre(p0, s, t0, n0, b0, kappa, tau):
         n0[0], n0[1], n0[2],
         b0[0], b0[1], b0[2]
     ]
-    t = np.arange(0, s, 0.1)
+    t = np.arange(0, 0.2, 0.1)
 
     # Plotting
     # ax = plt.axes(projection='3d')
@@ -87,4 +87,4 @@ def tanjent_to_hpr(tanjent, normal, binormal):
 
 
 if __name__ == "__main__":
-    pass
+    print(solve_frenet_serre((0, 0, 0), (0, 1, 0), (1, 0, 0), (0, 0, 1), 0, 0))
