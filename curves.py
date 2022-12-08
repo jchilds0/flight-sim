@@ -73,14 +73,14 @@ def solve_frenet_serre(p0, t0, n0, b0, kappa, tau):
     return sol
 
 
-def tanjent_to_hpr(tanjent, normal, binormal):
-    if tanjent[0] == 0:
+def tangent_to_hpr(tangent, normal, binormal):
+    if tangent[0] == 0:
         h = 180
-    elif tanjent[0] > 0:
-        h = atan(tanjent[1] / tanjent[0]) * 180 / pi + 90
+    elif tangent[0] > 0:
+        h = atan(tangent[1] / tangent[0]) * 180 / pi + 90
     else:
-        h = atan(tanjent[1] / tanjent[0]) * 180 / pi - 90
-    p = 90 - atan(tanjent[2]) * 180 / pi
+        h = atan(tangent[1] / tangent[0]) * 180 / pi - 90
+    p = 90 - atan(tangent[2]) * 180 / pi
     r = atan(normal[2]) * 180 / pi
 
     return h, p, r

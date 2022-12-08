@@ -3,7 +3,7 @@ from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import Vec3, NodePath, PandaNode, TextNode, GeoMipTerrain, TextureStage, WindowProperties
 from math import pi
-from curves import solve_frenet_serre, tanjent_to_hpr
+from curves import solve_frenet_serre, tangent_to_hpr
 
 
 class MyApp(ShowBase):
@@ -40,7 +40,7 @@ class MyApp(ShowBase):
         # Text Nodes
         self.text = {
             'Pos': TextNode('pos'),
-            'Tanjent': TextNode('tanjent'),
+            'Tangent': TextNode('tangent'),
             'Normal': TextNode('normal'),
             'Binormal': TextNode('binormal'),
             'kappa': TextNode('kappa'),
@@ -132,30 +132,6 @@ class MyApp(ShowBase):
         self.terrain.update()
         return task.cont
 
-    def updateDefault(self, task):
-        """ Default movement """
-        dt = globalClock.getDt()
-
-        self.plane.setPos(self.plane.getPos() + self.planeDir(1 / 20))
-
-        # If any movement keys are pressed, use the above time
-        # to calculate how far to move the character, and apply that.
-        if self.keyMap["up"]:
-            self.plane.setPos(self.plane.getPos() + Vec3(0, 0, 5.0 * dt))
-        if self.keyMap["down"]:
-            self.plane.setPos(self.plane.getPos() + Vec3(0, 0, -5.0 * dt))
-        if self.keyMap["left"]:
-            self.plane_theta += dt / 2
-            self.plane.setHpr(self.plane_theta * 180 / pi + 90, 90, 0)
-        if self.keyMap["right"]:
-            self.plane_theta -= dt / 2
-            self.plane.setHpr(self.plane_theta * 180 / pi + 90, 90, 0)
-
-        self.camera.setPos(self.plane.getPos() - self.planeDir(15) + Vec3(0, 0, 5))
-        self.camera.lookAt(self.floater)
-
-        return task.cont
-
     def updateCurvTor(self, task):
         """ Movement bases on curvature and torsion """
         dt = globalClock.getDt()
@@ -178,7 +154,7 @@ class MyApp(ShowBase):
         self.plane_N = (sol[index, 6], sol[index, 7], sol[index, 8])
         self.plane_B = (sol[index, 9], sol[index, 10], sol[index, 11])
 
-        self.plane.setHpr(tanjent_to_hpr(self.plane_T, self.plane_N, self.plane_B))
+        self.plane.setHpr(tangent_to_hpr(self.plane_T, self.plane_N, self.plane_B))
         self.camera.setPos(self.plane.getPos() - self.planeDir(20) + Vec3(0, 0, 10))
         self.camera.lookAt(self.floater)
 
@@ -189,14 +165,14 @@ class MyApp(ShowBase):
 
     def updateText(self, task):
         pos_str = "Plane Pos: " + str(self.plane.getPos())
-        tanjent_str = "Tanjent: " + self.strVector(self.plane_T)
+        tanjent_str = "Tangent: " + self.strVector(self.plane_T)
         normal_str = "Normal: " + self.strVector(self.plane_N)
         binormal_str = "Binormal: " + self.strVector(self.plane_B)
         kappa_str = "Curvature: " + str(round(self.kappa, 4))
         tau_str = "Torsion: " + str(round(self.tau, 4))
 
         self.text['Pos'].setText(pos_str)
-        self.text['Tanjent'].setText(tanjent_str)
+        self.text['Tangent'].setText(tanjent_str)
         self.text['Normal'].setText(normal_str)
         self.text['Binormal'].setText(binormal_str)
         self.text['kappa'].setText(kappa_str)
