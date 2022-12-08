@@ -34,7 +34,7 @@ def frenet_serre(y, t, kappa, tau):
     ]
 
 
-def solve_frenet_serre(p0, t0, n0, b0, kappa, tau):
+def solve_frenet_serre(p0, t0, n0, b0, kappa, tau, ival):
     """
     Solves the Frenet Serre equations to calculate a curve with
     the given inital conditions, curvature and torsion.'
@@ -43,12 +43,12 @@ def solve_frenet_serre(p0, t0, n0, b0, kappa, tau):
         pos((0, 1, 0), 10, (0, 0, 1), (0, -1, 0), (1, 0, 0), 1, 0)
 
     :param p0: initial curve position
-    :param s: final time
     :param t0: initial tanjent vector
     :param n0: initial normal vector
     :param b0: initial binormal vector
     :param kappa: curvature
     :param tau: torsion
+    :param ival: iterval to sample ahead
     :return: solution curve from 0 to s
     """
     y0 = [
@@ -57,7 +57,7 @@ def solve_frenet_serre(p0, t0, n0, b0, kappa, tau):
         n0[0], n0[1], n0[2],
         b0[0], b0[1], b0[2]
     ]
-    t = np.arange(0, 0.2, 0.1)
+    t = np.arange(0, ival, 0.1)
 
     # Plotting
     # ax = plt.axes(projection='3d')

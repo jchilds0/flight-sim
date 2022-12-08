@@ -1,13 +1,12 @@
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task.TaskManagerGlobal import taskMgr
-from panda3d.core import Vec3, NodePath, PandaNode, TextNode, GeoMipTerrain, TextureStage, WindowProperties
-from math import pi
+from panda3d.core import Vec3, NodePath, PandaNode, TextNode, GeoMipTerrain, TextureStage, WindowProperties, LineSegs
 from curves import solve_frenet_serre, tangent_to_hpr
 
 
 class MyApp(ShowBase):
-    DEFAULT_STEP = 0.1
+    INTERVAL = 150
     SCALE = 0.1
 
     def __init__(self):
@@ -71,6 +70,12 @@ class MyApp(ShowBase):
         self.accept("d-up", self.updateKeyMap, ["curv+", False])
 
         self.updateTask = taskMgr.add(self.updateCurvTor, "updatePos")
+
+        # Curve
+        self.line = LineSegs()
+        self.prev_line = LineSegs()
+        self.line_node = self.prev_node = None
+        self.line_np = self.prev_np = None
 
     def __init_text(self):
         lst = list(self.text.items())
@@ -146,7 +151,9 @@ class MyApp(ShowBase):
             self.kappa -= dt * self.SCALE
 
         sol = solve_frenet_serre(self.plane.getPos(), self.plane_T,
-                                 self.plane_N, self.plane_B, self.kappa, self.tau)
+                                 self.plane_N, self.plane_B, self.kappa, self.tau, self.INTERVAL)
+
+        self.draw_curve(sol[:, 0], sol[:, 1], sol[:, 2])
 
         index = 1
         self.plane.setPos(sol[index, 0], sol[index, 1], sol[index, 2])
@@ -179,6 +186,27 @@ class MyApp(ShowBase):
         self.text['tau'].setText(tau_str)
 
         return task.cont
+
+    def draw_curve(self, x, y, z):
+        if self.line_np is not None:
+            self.line_np.detach_node()
+
+        self.prev_line.moveTo(x[0], y[0], z[0])
+        self.prev_line.drawTo(x[1], y[1], z[1])
+        self.prev_line.setThickness(4)
+
+        for i in range(len(x) - 1):
+            self.line.moveTo(x[i], y[i], z[i])
+            self.line.drawTo(x[i + 1], y[i + 1], z[i + 1])
+            self.line.setThickness(4)
+
+        self.line_node = self.line.create()
+        self.line_np = NodePath(self.line_node)
+        self.line_np.reparentTo(render)
+
+        self.prev_node = self.prev_line.create()
+        self.prev_np = NodePath(self.prev_node)
+        self.prev_np.reparentTo(render)
 
     @staticmethod
     def strVector(vector):
