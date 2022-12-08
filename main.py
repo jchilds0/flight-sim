@@ -46,7 +46,11 @@ class MyApp(ShowBase):
             'tau': TextNode('tau'),
         }
 
+        self.control_nodes = []
+
         self.__init_text()
+
+        self.__init_controls()
 
         # Floater for camera
         self.floater = NodePath(PandaNode("floater"))
@@ -58,6 +62,8 @@ class MyApp(ShowBase):
             "tor-": False,
             "curv+": False,
             "curv-": False,
+            "tor0": False,
+            "curv0": False,
         }
 
         self.accept("w", self.updateKeyMap, ["tor+", True])
@@ -68,6 +74,10 @@ class MyApp(ShowBase):
         self.accept("a-up", self.updateKeyMap, ["curv-", False])
         self.accept("d", self.updateKeyMap, ["curv+", True])
         self.accept("d-up", self.updateKeyMap, ["curv+", False])
+        self.accept("q", self.updateKeyMap, ["curv0", True])
+        self.accept("q-up", self.updateKeyMap, ["curv0", False])
+        self.accept("e", self.updateKeyMap, ["tor0", True])
+        self.accept("e-up", self.updateKeyMap, ["tor0", False])
 
         self.updateTask = taskMgr.add(self.updateCurvTor, "updatePos")
 
@@ -88,6 +98,22 @@ class MyApp(ShowBase):
             self.text[node].setPos(-1.6, 0, -0.3 - i / 10)
 
         self.updateTaskText = taskMgr.add(self.updateText, "updateText")
+
+    def __init_controls(self):
+        controls = [
+            "W + S: Torsion",
+            "A + D: Curvature",
+            "Q: Set Curvature 0",
+            "E: Set Torsion 0",
+        ]
+
+        for i, item in enumerate(controls):
+            node = TextNode(str(i))
+            np = aspect2d.attachNewNode(node)
+            np.setScale(0.07)
+            np.setPos(-1.6, 0, 0.8 - i / 10)
+            node.setText(item)
+            self.control_nodes.append((node, np))
 
     def __init_terrain(self):
         self.terrain.setHeightfield("models/terrain/heightmap.png")
@@ -149,6 +175,10 @@ class MyApp(ShowBase):
             self.kappa += dt * self.SCALE
         if self.keyMap["curv-"]:
             self.kappa -= dt * self.SCALE
+        if self.keyMap["curv0"]:
+            self.kappa = 0
+        if self.keyMap["tor0"]:
+            self.tau = 0
 
         sol = solve_frenet_serre(self.plane.getPos(), self.plane_T,
                                  self.plane_N, self.plane_B, self.kappa, self.tau, self.INTERVAL)
@@ -171,7 +201,7 @@ class MyApp(ShowBase):
         return Vec3(scale * self.plane_T[0], scale * self.plane_T[1], scale * self.plane_T[2])
 
     def updateText(self, task):
-        pos_str = "Plane Pos: " + str(self.plane.getPos())
+        pos_str = "Plane Pos: " + self.strVector(self.plane.getPos())
         tanjent_str = "Tangent: " + self.strVector(self.plane_T)
         normal_str = "Normal: " + self.strVector(self.plane_N)
         binormal_str = "Binormal: " + self.strVector(self.plane_B)
