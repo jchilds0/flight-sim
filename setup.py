@@ -5,7 +5,7 @@ setup(
     options={
         'build_apps': {
             'gui_apps': {
-                'flight-sim': 'src/main.py',
+                'flight-sim': 'main.py',
             },
 
             # Set up output logging, important for GUI apps!
@@ -15,7 +15,7 @@ setup(
             # Specify which files are included with the distribution
             'include_patterns': [
                 'models/**',
-                'src/**'
+                '*.bam',
             ],
 
             # Platforms that we're building for.

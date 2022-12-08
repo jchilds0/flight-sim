@@ -5,7 +5,7 @@ from pandac.PandaModules import Texture, TextureStage, DirectionalLight, Ambient
 
 class SkySphere(DirectObject):
     def __init__(self):
-        self.sphere = loader.loadModel("../models/skysphere/InvertedSphere.egg")
+        self.sphere = loader.loadModel("models/skysphere/InvertedSphere.egg")
         # Load a sphere with a radius of 1 unit and the faces directed inward.
 
         self.sphere.setTexGen(TextureStage.getDefault(), TexGenAttrib.MWorldPosition)
@@ -14,7 +14,7 @@ class SkySphere(DirectObject):
         self.sphere.setTexScale(TextureStage.getDefault(), .5)
         # Create some 3D texture coordinates on the sphere. For more info on this, check the Panda3D manual.
 
-        tex = loader.loadCubeMap("../models/skysphere/BlueGreenNebula_#.png")
+        tex = loader.loadCubeMap("models/skysphere/BlueGreenNebula_#.png")
         self.sphere.setTexture(tex)
         # Load the cube map and apply it to the sphere.
 

@@ -21,7 +21,7 @@ class MyApp(ShowBase):
         # Landscape
         # Set up the GeoMipTerrain
         terrain = GeoMipTerrain("myDynamicTerrain")
-        terrain.setHeightfield("../models/terrain/Flow-Tertiary.tif")
+        terrain.setHeightfield("models/terrain/Flow-Tertiary.tif")
 
         # Set terrain properties
         terrain.setBlockSize(128)
@@ -33,7 +33,7 @@ class MyApp(ShowBase):
         root = terrain.getRoot()
         root.reparentTo(render)
         root.setSz(50)
-        terrain.setColorMap("../models/terrain/Texture/normal.tif")
+        terrain.setColorMap("models/terrain/Texture/normal.tif")
 
         # Generate it.
         terrain.generate()
@@ -53,12 +53,12 @@ class MyApp(ShowBase):
         taskMgr.add(self.skysphereTask, "SkySphere Task")
 
         # Plane Model
-        self.plane = loader.loadModel("../models/plane/piper_pa18.obj")
+        self.plane = loader.loadModel("models/plane/piper_pa18.obj")
         self.plane.reparentTo(render)
         planeTS = TextureStage('ts')
-        planeDiffuse = loader.loadTexture("../models/plane/textures/piper_diffuse.jpg")
-        planeBump = loader.loadTexture("../models/plane/textures/piper_bump.jpg")
-        planeRefl = loader.loadTexture("../models/plane/textures/piper_refl.jpg")
+        planeDiffuse = loader.loadTexture("models/plane/textures/piper_diffuse.jpg")
+        planeBump = loader.loadTexture("models/plane/textures/piper_bump.jpg")
+        planeRefl = loader.loadTexture("models/plane/textures/piper_refl.jpg")
         self.plane.setTexture(planeTS, planeDiffuse)
 
         self.plane.setPos(0, 30, 0)
