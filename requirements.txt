@@ -2,4 +2,3 @@ panda3d~=1.10.9
 scipy
 numpy
 setuptools
-pandas
