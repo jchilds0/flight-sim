@@ -15,6 +15,9 @@ setup(
             # Specify which files are included with the distribution
             'include_patterns': [
                 'models/**',
+                'terrain/**',
+                'ui/**',
+                'fonts/**'
                 '*.bam',
             ],
 

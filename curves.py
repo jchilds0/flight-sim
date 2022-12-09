@@ -74,6 +74,7 @@ def solve_frenet_serre(p0, t0, n0, b0, kappa, tau, ival):
 
 
 def tangent_to_hpr(tangent, normal, binormal):
+    """ Use the frenet frame to calculate the heading, pitch and roll """
     if tangent[0] == 0:
         h = 180
     elif tangent[0] > 0:
@@ -81,7 +82,7 @@ def tangent_to_hpr(tangent, normal, binormal):
     else:
         h = atan(tangent[1] / tangent[0]) * 180 / pi - 90
     p = 90 - atan(tangent[2]) * 180 / pi
-    r = atan(normal[2]) * 180 / pi
+    r = 0
 
     return h, p, r
 

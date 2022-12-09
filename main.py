@@ -1,13 +1,16 @@
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task.TaskManagerGlobal import taskMgr
-from panda3d.core import Vec3, NodePath, PandaNode, TextNode, GeoMipTerrain, TextureStage, WindowProperties, LineSegs
+from panda3d.core import Vec3, NodePath, PandaNode, TextNode, GeoMipTerrain, TextureStage, WindowProperties, LineSegs, \
+    PointLight
 from curves import solve_frenet_serre, tangent_to_hpr
+from direct.gui.DirectGui import *
+from collections import deque
 
 
 class MyApp(ShowBase):
     INTERVAL = 150
-    SCALE = 0.1
+    SCALE = 0.001
 
     def __init__(self):
         ShowBase.__init__(self)
@@ -18,7 +21,6 @@ class MyApp(ShowBase):
         base.win.requestProperties(props)
 
         # Landscape
-        # Set up the GeoMipTerrain
         self.terrain = GeoMipTerrain("myDynamicTerrain")
         self.root = self.terrain.getRoot()
 
@@ -50,8 +52,6 @@ class MyApp(ShowBase):
 
         self.__init_text()
 
-        self.__init_controls()
-
         # Floater for camera
         self.floater = NodePath(PandaNode("floater"))
         self.floater.reparentTo(self.plane)
@@ -64,6 +64,7 @@ class MyApp(ShowBase):
             "curv-": False,
             "tor0": False,
             "curv0": False,
+            "esc": False,
         }
 
         self.accept("w", self.updateKeyMap, ["tor+", True])
@@ -78,14 +79,80 @@ class MyApp(ShowBase):
         self.accept("q-up", self.updateKeyMap, ["curv0", False])
         self.accept("e", self.updateKeyMap, ["tor0", True])
         self.accept("e-up", self.updateKeyMap, ["tor0", False])
-
-        self.updateTask = taskMgr.add(self.updateCurvTor, "updatePos")
+        self.accept("escape", self.startGame)
 
         # Curve
         self.line = LineSegs()
         self.prev_line = LineSegs()
         self.line_node = self.prev_node = None
-        self.line_np = self.prev_np = None
+        self.line_np = None
+        self.prev_np = deque()
+
+        # Lighting
+        plight = PointLight('plight')
+        plight.setColor((1, 1, 1, 1))
+        plnp = render.attachNewNode(plight)
+        plnp.setPos(200, 200, 200)
+        render.setLight(plnp)
+
+        self.font = loader.loadFont("fonts/Wbxkomik.ttf")
+
+        # Start Screen
+        self.buttonImages = (
+            loader.loadTexture("ui/UIButton.png"),
+            loader.loadTexture("ui/UIButtonPressed.png"),
+            loader.loadTexture("ui/UIButtonHighlighted.png"),
+            loader.loadTexture("ui/UIButtonDisabled.png")
+        )
+
+        self.titleMenuBackdrop = DirectFrame(frameColor=(0, 0, 0, 1),
+                                             frameSize=(-1, 1, -1, 1),
+                                             parent=render2d)
+        self.titleMenu = DirectFrame(frameColor=(1, 1, 1, 0))
+        self.__init_titleScreen()
+
+        # Game over
+        self.gameOverScreen = DirectDialog(frameSize=(-0.7, 0.7, -0.7, 0.7),
+                                           fadeScreen=0.4,
+                                           relief=DGG.FLAT,
+                                           frameTexture="ui/stoneFrame.png")
+        self.__init_gameoverScreen()
+        self.menu = True
+
+    def startGame(self):
+        self.gameOverScreen.hide()
+        self.titleMenu.hide()
+        self.titleMenuBackdrop.hide()
+
+        # Reset plane pos
+        self.plane.setPos(50, 50, 30)
+        self.plane.setHpr(0, 90, 0)
+        self.time = 0
+        self.tau = 0
+        self.kappa = 0
+        self.plane_T = (0, 1, 0)
+        self.plane_N = (1, 0, 0)
+        self.plane_B = (0, 0, 1)
+
+        # Clear Lines
+        if self.prev_np is not None:
+            n = len(self.prev_np)
+            for _ in range(n):
+                self.prev_np.pop().detach_node()
+
+            self.prev_np.clear()
+
+        # Tasks
+        if self.menu:
+            self.menu = True
+            self.__init_controls()
+
+            taskMgr.add(self.updateCollisionDetection, "updateCol")
+            taskMgr.add(self.updateCurvTor, "updatePos")
+            taskMgr.add(self.updateText, "updateText")
+
+    def quit(self):
+        base.userExit()
 
     def __init_text(self):
         lst = list(self.text.items())
@@ -97,14 +164,13 @@ class MyApp(ShowBase):
             self.text[node].setScale(0.07)
             self.text[node].setPos(-1.6, 0, -0.3 - i / 10)
 
-        self.updateTaskText = taskMgr.add(self.updateText, "updateText")
-
     def __init_controls(self):
         controls = [
             "W + S: Torsion",
             "A + D: Curvature",
-            "Q: Set Curvature 0",
-            "E: Set Torsion 0",
+            "Q: Set Curvature to 0",
+            "E: Set Torsion to 0",
+            "Esc: Restart"
         ]
 
         for i, item in enumerate(controls):
@@ -116,19 +182,21 @@ class MyApp(ShowBase):
             self.control_nodes.append((node, np))
 
     def __init_terrain(self):
-        self.terrain.setHeightfield("models/terrain/heightmap.png")
+        self.terrain.setHeightfield("terrain/heightmap_2049.png")
 
         # Set terrain properties
-        self.terrain.setBlockSize(128)
+        self.terrain.setBlockSize(1024)
         self.terrain.setNear(40)
-        self.terrain.setFar(100)
-        self.terrain.setFocalPoint(base.camera)
+        self.terrain.setFar(1000)
+        self.terrain.setFocalPoint(self.camera)
 
         # Store the root NodePath for convenience
         self.root.reparentTo(render)
-        terrainNormal = loader.loadTexture("models/terrain/normal.png")
+        terrainNormal = loader.loadTexture("terrain/base_color_darker_2049.png")
         self.root.setTexture(terrainNormal)
-        self.root.setSz(50)
+        self.root.setSz(75)
+        self.root.setSx(0.1)
+        self.root.setSy(0.1)
 
         # Generate it.
         self.terrain.generate()
@@ -142,14 +210,80 @@ class MyApp(ShowBase):
         planeRefl = loader.loadTexture("models/plane/textures/piper_refl.jpg")
         self.plane.setTexture(planeTS, planeDiffuse)
 
-        self.plane.setPos(100, 100, 100)
-        self.plane.setHpr(0, 90, 0)
-        self.time = 0
-        self.tau = 0
-        self.kappa = 0
-        self.plane_T = (0, 1, 0)
-        self.plane_N = (1, 0, 0)
-        self.plane_B = (0, 0, 1)
+    def __init_titleScreen(self):
+        title3 = DirectLabel(text="Flight Simulator",
+                             scale=0.125,
+                             pos=(0, 0, 0.65),
+                             parent=self.titleMenu,
+                             relief=None,
+                             text_font=self.font,
+                             text_fg=(1, 1, 1, 1))
+
+        btn = DirectButton(text="Start Game",
+                           command=self.startGame,
+                           pos=(0, 0, 0.2),
+                           parent=self.titleMenu,
+                           scale=0.1,
+                           text_font=self.font,
+                           clickSound=loader.loadSfx("sounds/UIClick.ogg"),
+                           frameTexture=self.buttonImages,
+                           frameSize=(-4, 4, -1, 1),
+                           text_scale=0.75,
+                           relief=DGG.FLAT,
+                           text_pos=(0, -0.2))
+        btn.setTransparency(True)
+
+        btn = DirectButton(text="Quit",
+                           command=self.quit,
+                           pos=(0, 0, -0.2),
+                           parent=self.titleMenu,
+                           scale=0.1,
+                           text_font=self.font,
+                           clickSound=loader.loadSfx("sounds/UIClick.ogg"),
+                           frameTexture=self.buttonImages,
+                           frameSize=(-4, 4, -1, 1),
+                           text_scale=0.75,
+                           relief=DGG.FLAT,
+                           text_pos=(0, -0.2))
+        btn.setTransparency(True)
+
+    def __init_gameoverScreen(self):
+        self.gameOverScreen.hide()
+
+        label = DirectLabel(text="You Crashed!",
+                            parent=self.gameOverScreen,
+                            scale=0.1,
+                            pos=(0, 0, 0.2),
+                            text_font=self.font,
+                            relief=None)
+
+        btn = DirectButton(text="Restart",
+                           command=self.startGame,
+                           pos=(-0.3, 0, -0.2),
+                           parent=self.gameOverScreen,
+                           scale=0.07,
+                           text_font=self.font,
+                           clickSound=loader.loadSfx("sounds/UIClick.ogg"),
+                           frameTexture=self.buttonImages,
+                           frameSize=(-4, 4, -1, 1),
+                           text_scale=0.75,
+                           relief=DGG.FLAT,
+                           text_pos=(0, -0.2))
+        btn.setTransparency(True)
+
+        btn = DirectButton(text="Quit",
+                           command=self.quit,
+                           pos=(0.3, 0, -0.2),
+                           parent=self.gameOverScreen,
+                           scale=0.07,
+                           text_font=self.font,
+                           clickSound=loader.loadSfx("sounds/UIClick.ogg"),
+                           frameTexture=self.buttonImages,
+                           frameSize=(-4, 4, -1, 1),
+                           text_scale=0.75,
+                           relief=DGG.FLAT,
+                           text_pos=(0, -0.2))
+        btn.setTransparency(True)
 
     def skysphereTask(self, task):
         self.skysphere.setPos(base.camera, 0, 0, 0)
@@ -168,13 +302,13 @@ class MyApp(ShowBase):
         dt = globalClock.getDt()
 
         if self.keyMap["tor+"]:
-            self.tau += dt * self.SCALE
+            self.tau += self.SCALE
         if self.keyMap["tor-"]:
-            self.tau -= dt * self.SCALE
+            self.tau -= self.SCALE
         if self.keyMap["curv+"]:
-            self.kappa += dt * self.SCALE
+            self.kappa += self.SCALE
         if self.keyMap["curv-"]:
-            self.kappa -= dt * self.SCALE
+            self.kappa -= self.SCALE
         if self.keyMap["curv0"]:
             self.kappa = 0
         if self.keyMap["tor0"]:
@@ -235,8 +369,21 @@ class MyApp(ShowBase):
         self.line_np.reparentTo(render)
 
         self.prev_node = self.prev_line.create()
-        self.prev_np = NodePath(self.prev_node)
-        self.prev_np.reparentTo(render)
+        self.prev_np.append(NodePath(self.prev_node))
+        self.prev_np[-1].reparentTo(render)
+
+    def updateCollisionDetection(self, task):
+        plane_x, plane_y, plane_z = self.plane.getPos()
+
+        if plane_z <= self.root.getSz() * self.terrain.getElevation(plane_x, plane_y):
+            self.plane_T = (0, 0, 0)
+            self.plane_N = (0, 0, 0)
+            self.plane_B = (0, 0, 0)
+
+            if self.gameOverScreen.isHidden():
+                self.gameOverScreen.show()
+
+        return task.cont
 
     @staticmethod
     def strVector(vector):
