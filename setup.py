@@ -1,5 +1,6 @@
 from setuptools import setup
 
+
 setup(
     name='flight-sim',
     options={
@@ -17,8 +18,9 @@ setup(
                 'models/**',
                 'terrain/**',
                 'ui/**',
-                'fonts/**'
-                '*.bam',
+                'fonts/*.ttf',
+                'sounds/*.ogg',
+                'src/*.bam'
             ],
 
             # Platforms that we're building for.

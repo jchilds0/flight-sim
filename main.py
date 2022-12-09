@@ -1,11 +1,11 @@
 from direct.showbase.ShowBase import ShowBase
-from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task.TaskManagerGlobal import taskMgr
-from panda3d.core import Vec3, NodePath, PandaNode, TextNode, GeoMipTerrain, TextureStage, WindowProperties, LineSegs, \
-    PointLight
-from curves import solve_frenet_serre, tangent_to_hpr
+from panda3d.core import NodePath, PandaNode, TextNode, GeoMipTerrain, WindowProperties, LineSegs, \
+    PointLight, TextureStage, TexGenAttrib
+from src.curves import solve_frenet_serre, tangent_to_hpr
 from direct.gui.DirectGui import *
 from collections import deque
+from src.plane import Plane
 
 
 class MyApp(ShowBase):
@@ -27,16 +27,12 @@ class MyApp(ShowBase):
         self.__init_terrain()
 
         # Skybox
-        self.skysphere = loader.loadModel("SkySphere.bam")
-        self.skysphere.setBin('background', 1)
-        self.skysphere.setDepthWrite(0)
-        self.skysphere.reparentTo(render)
-        taskMgr.add(self.skysphereTask, "SkySphere Task")
+        self.sphere = loader.loadModel("models/skysphere/InvertedSphere.egg")
 
-        # Plane Model
-        self.plane = loader.loadModel("models/plane/piper_pa18.obj")
+        self.__init_skybox()
 
-        self.__init_plane()
+        # Plane
+        self.plane = Plane()
 
         # Text Nodes
         self.text = {
@@ -54,7 +50,7 @@ class MyApp(ShowBase):
 
         # Floater for camera
         self.floater = NodePath(PandaNode("floater"))
-        self.floater.reparentTo(self.plane)
+        self.floater.reparentTo(self.plane.model)
         self.floater.setZ(5)
 
         self.keyMap = {
@@ -124,15 +120,8 @@ class MyApp(ShowBase):
         self.titleMenu.hide()
         self.titleMenuBackdrop.hide()
 
-        # Reset plane pos
-        self.plane.setPos(50, 50, 30)
-        self.plane.setHpr(0, 90, 0)
-        self.time = 0
-        self.tau = 0
-        self.kappa = 0
-        self.plane_T = (0, 1, 0)
-        self.plane_N = (1, 0, 0)
-        self.plane_B = (0, 0, 1)
+        # Initialise Plane
+        self.plane.start(p0=(50, 50, 30))
 
         # Clear Lines
         if self.prev_np is not None:
@@ -188,7 +177,7 @@ class MyApp(ShowBase):
         self.terrain.setBlockSize(1024)
         self.terrain.setNear(40)
         self.terrain.setFar(1000)
-        self.terrain.setFocalPoint(self.camera)
+        self.terrain.setFocalPoint(base.camera)
 
         # Store the root NodePath for convenience
         self.root.reparentTo(render)
@@ -200,15 +189,27 @@ class MyApp(ShowBase):
 
         # Generate it.
         self.terrain.generate()
-        taskMgr.add(self.updateTerrain, "updateTer")
+        # taskMgr.add(self.updateTerrain, "updateTer")
 
-    def __init_plane(self):
-        self.plane.reparentTo(render)
-        planeTS = TextureStage('ts')
-        planeDiffuse = loader.loadTexture("models/plane/textures/piper_diffuse.jpg")
-        planeBump = loader.loadTexture("models/plane/textures/piper_bump.jpg")
-        planeRefl = loader.loadTexture("models/plane/textures/piper_refl.jpg")
-        self.plane.setTexture(planeTS, planeDiffuse)
+    def __init_skybox(self):
+        # Load a sphere with a radius of 1 unit and the faces directed inward.
+        self.sphere.setTexGen(TextureStage.getDefault(), TexGenAttrib.MWorldPosition)
+        self.sphere.setTexProjector(TextureStage.getDefault(), render, self.sphere)
+        self.sphere.setTexPos(TextureStage.getDefault(), 0, 0, 0)
+        self.sphere.setTexScale(TextureStage.getDefault(), .5)
+        # Create some 3D texture coordinates on the sphere. For more info on this, check the Panda3D manual.
+
+        tex = loader.loadCubeMap("models/skysphere/BlueGreenNebula_#.png")
+        self.sphere.setTexture(tex)
+        # Load the cube map and apply it to the sphere.
+
+        self.sphere.setLightOff()
+        # Tell the sphere to ignore the lighting.
+
+        self.sphere.setScale(1000)
+        # Increase the scale of the sphere so it will be larger than the scene.
+
+        self.sphere.reparentTo(render)
 
     def __init_titleScreen(self):
         title3 = DirectLabel(text="Flight Simulator",
@@ -285,10 +286,6 @@ class MyApp(ShowBase):
                            text_pos=(0, -0.2))
         btn.setTransparency(True)
 
-    def skysphereTask(self, task):
-        self.skysphere.setPos(base.camera, 0, 0, 0)
-        return task.cont
-
     def updateKeyMap(self, controlName, controlState):
         self.keyMap[controlName] = controlState
 
@@ -299,48 +296,51 @@ class MyApp(ShowBase):
 
     def updateCurvTor(self, task):
         """ Movement bases on curvature and torsion """
-        dt = globalClock.getDt()
-
         if self.keyMap["tor+"]:
-            self.tau += self.SCALE
+            self.plane.tau += self.SCALE
         if self.keyMap["tor-"]:
-            self.tau -= self.SCALE
+            self.plane.tau -= self.SCALE
         if self.keyMap["curv+"]:
-            self.kappa += self.SCALE
+            self.plane.kappa += self.SCALE
         if self.keyMap["curv-"]:
-            self.kappa -= self.SCALE
+            self.plane.kappa -= self.SCALE
         if self.keyMap["curv0"]:
-            self.kappa = 0
+            self.plane.kappa = 0
         if self.keyMap["tor0"]:
-            self.tau = 0
+            self.plane.tau = 0
 
-        sol = solve_frenet_serre(self.plane.getPos(), self.plane_T,
-                                 self.plane_N, self.plane_B, self.kappa, self.tau, self.INTERVAL)
+        sol = solve_frenet_serre(self.plane.getPos(), self.plane.getT(), self.plane.getN(), self.plane.getB(),
+                                 self.plane.kappa, self.plane.tau, self.INTERVAL)
 
         self.draw_curve(sol[:, 0], sol[:, 1], sol[:, 2])
 
         index = 1
         self.plane.setPos(sol[index, 0], sol[index, 1], sol[index, 2])
-        self.plane_T = (sol[index, 3], sol[index, 4], sol[index, 5])
-        self.plane_N = (sol[index, 6], sol[index, 7], sol[index, 8])
-        self.plane_B = (sol[index, 9], sol[index, 10], sol[index, 11])
+        self.plane.setT(sol[index, 3], sol[index, 4], sol[index, 5])
+        self.plane.setN(sol[index, 6], sol[index, 7], sol[index, 8])
+        self.plane.setB(sol[index, 9], sol[index, 10], sol[index, 11])
 
-        self.plane.setHpr(tangent_to_hpr(self.plane_T, self.plane_N, self.plane_B))
-        self.camera.setPos(self.plane.getPos() - self.planeDir(20) + Vec3(0, 0, 10))
+        self.plane.setHpr(tangent_to_hpr(self.plane.getT(), self.plane.getN(), self.plane.getB()))
+
+        self.camPos(20)
         self.camera.lookAt(self.floater)
 
         return task.cont
 
-    def planeDir(self, scale):
-        return Vec3(scale * self.plane_T[0], scale * self.plane_T[1], scale * self.plane_T[2])
+    def camPos(self, scale):
+        x = self.plane.getPos()[0] - scale * self.plane.getT()[0]
+        y = self.plane.getPos()[1] - scale * self.plane.getT()[1]
+        z = self.plane.getPos()[2] - scale * self.plane.getT()[2] + 10
+
+        self.camera.setPos(x, y, z)
 
     def updateText(self, task):
         pos_str = "Plane Pos: " + self.strVector(self.plane.getPos())
-        tanjent_str = "Tangent: " + self.strVector(self.plane_T)
-        normal_str = "Normal: " + self.strVector(self.plane_N)
-        binormal_str = "Binormal: " + self.strVector(self.plane_B)
-        kappa_str = "Curvature: " + str(round(self.kappa, 4))
-        tau_str = "Torsion: " + str(round(self.tau, 4))
+        tanjent_str = "Tangent: " + self.strVector(self.plane.getT())
+        normal_str = "Normal: " + self.strVector(self.plane.getN())
+        binormal_str = "Binormal: " + self.strVector(self.plane.getB())
+        kappa_str = "Curvature: " + str(round(self.plane.kappa, 4))
+        tau_str = "Torsion: " + str(round(self.plane.tau, 4))
 
         self.text['Pos'].setText(pos_str)
         self.text['Tangent'].setText(tanjent_str)
@@ -376,9 +376,9 @@ class MyApp(ShowBase):
         plane_x, plane_y, plane_z = self.plane.getPos()
 
         if plane_z <= self.root.getSz() * self.terrain.getElevation(plane_x, plane_y):
-            self.plane_T = (0, 0, 0)
-            self.plane_N = (0, 0, 0)
-            self.plane_B = (0, 0, 0)
+            self.plane.setT(0, 0, 0)
+            self.plane.setN(0, 0, 0)
+            self.plane.setB(0, 0, 0)
 
             if self.gameOverScreen.isHidden():
                 self.gameOverScreen.show()
@@ -391,6 +391,7 @@ class MyApp(ShowBase):
 
         return "(" + str(round(vector[0], digits)) + ", " + str(round(vector[1], digits)) \
                + ", " + str(round(vector[2], digits)) + ")"
+
 
 app = MyApp()
 app.run()
