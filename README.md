@@ -2,7 +2,7 @@
 A flight simulator controlled using torsion and curvature. 
 Built using the panda3D graphics library
 
-# Background
+## Background
 
 A curve $\gamma$ is a map from $\mathbb{R}$ to $\mathbb{R}^3$. We assume the curve 
 is unit speed to simplify the formulas, $|\gamma'(s)| = 1$. Then define the tangent
