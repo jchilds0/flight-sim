@@ -29,6 +29,7 @@ class Menu:
         self.homeScreen = DirectFrame()
         self.controlScreenText = PandaNode("controlScreen")
         self.controlScreenButton = DirectFrame()
+        self.controlScreenButton.hide()
         self.controlNodes = []
 
         self.titleScreenCreate()
@@ -118,7 +119,7 @@ class Menu:
             "A + D: Curvature",
             "Q: Set Curvature to 0",
             "E: Set Torsion to 0",
-            "Esc: Restart"
+            "Esc: Return to Menu"
         ]
 
         for i, string in enumerate(controls):

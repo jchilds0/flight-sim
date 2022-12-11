@@ -9,7 +9,7 @@ is unit speed to simplify the formulas, $|\gamma'(s)| = 1$. Then define the tang
 vector T by $T(s) = \gamma'(s)$. Similarily define the normal vector N, as the unit 
 vector in the direction of $T'(s)$. Finally define $B(s)$ as the unit vector in 
 the direction of $T(s) \times N(s)$, where $\times$ is the cross product in 
-$\mathbb{R}^3$. Finally the curvature $ \kappa $ at a point $\gamma(s)$ is defined 
+$\mathbb{R}^3$. Finally the curvature $\kappa$ at a point $\gamma(s)$ is defined 
 as the length of T'(s), $\kappa(s) = |T'(s)|$. And the torsion $\tau$ at a point 
 $\gamma(s)$ is defined $- N(s) \cdot B'(s)$, where $\cdot$ is the dot product.
 

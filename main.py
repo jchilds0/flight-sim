@@ -37,6 +37,7 @@ class MyApp(ShowBase):
         self.accept("e", self.updateKeyMap, ["tor0", True])
         self.accept("e-up", self.updateKeyMap, ["tor0", False])
         self.accept("escape", self.updateKeyMap, ["esc", True])
+        self.accept("escape-up", self.updateKeyMap, ["esc", False])
 
         self.menu()
 

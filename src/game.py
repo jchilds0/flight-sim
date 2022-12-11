@@ -32,9 +32,17 @@ class World(ABC):
 
         # Text Nodes
         self.text = ['Pos', 'Tangent', 'Normal', 'Binormal', 'kappa', 'tau']
-        self.textObject = [
-            OnscreenText(pos=(-1.7, -0.4 - i / 10), scale=0.07, align=TextNode.ALeft, fg=(255, 255, 255, 1))
-            for i in range(len(self.text))]
+        self.textObject = [TextNode(string) for string in self.text]
+
+        self.nodeHUD = PandaNode("HUD")
+        self.npHUD = NodePath(self.nodeHUD)
+
+        for i, node in enumerate(self.textObject):
+            np = NodePath(node)
+            np.setPos(-1.7, 0, -0.4 - i / 10)
+            np.setScale(0.07)
+            self.nodeHUD.addChild(node)
+            node.setTextColor(255, 255, 255, 1)
 
         # Floater for camera
         self.floater = NodePath(PandaNode("floater"))
@@ -43,10 +51,15 @@ class World(ABC):
 
         # Curve
         self.line = LineSegs()
+        self.line.setThickness(4)
         self.prev_line = LineSegs()
-        self.line_node = self.prev_node = None
-        self.line_np = None
-        self.prev_np = deque()
+        self.prev_line.setThickness(4)
+
+        self.curves = PandaNode('Curve')
+        self.lineAhead = PandaNode('lineAhead')
+        self.lineBehind = PandaNode('lineBehind')
+        NodePath(self.lineAhead).reparentTo(NodePath(self.curves))
+        NodePath(self.lineBehind).reparentTo(NodePath(self.curves))
 
         # Lighting
         plight = PointLight('plight')
@@ -86,13 +99,15 @@ class World(ABC):
         self.root.reparentTo(render)
         self.sphere.reparentTo(render)
         self.plane.model.reparentTo(render)
+        NodePath(self.curves).reparentTo(render)
 
     def startUpdaters(self):
         """ Add tasks to task manager """
         self.run()
+        self.npHUD.reparentTo(aspect2d)
         taskMgr.add(self.updateCollisionDetection, "updateCol")
         taskMgr.add(self.updateCurvTor, "updatePos")
-        taskMgr.add(self.updateText, "updateText")
+        taskMgr.add(self.updateHUD, "updateHUD")
 
     def run(self):
         """ Reset variables to rerun the program """
@@ -107,23 +122,24 @@ class World(ABC):
         self.plane.start(p0=(50, 50, 30))
 
         # Clear Lines
-        self.clearCurve()
+        self.lineAhead.removeAllChildren()
+        self.lineBehind.removeAllChildren()
 
     @staticmethod
     def stopUpdaters():
         """ Stop tasks """
         taskMgr.remove("updateCol")
         taskMgr.remove("updatePos")
-        taskMgr.remove("updateText")
+        taskMgr.remove("updateHUD")
 
     def clean(self):
         self.gameOverScreen.hide()
         self.titleScreen.hide()
-        self.clearText()
-        self.clearCurve()
+        self.npHUD.detachNode()
         self.root.detachNode()
         self.sphere.detachNode()
         self.plane.model.detachNode()
+        NodePath(self.curves).detachNode()
 
         self.stopUpdaters()
 
@@ -167,14 +183,6 @@ class World(ABC):
         self.sphere.setTexture(tex)
         self.sphere.setLightOff()
         self.sphere.setScale(1000)
-
-    def drawText(self):
-        for i, string in enumerate(self.text):
-            self.textObject[i] = OnscreenText(text=string, pos=(-1.6, 0, -0.3 - i / 10), scale=0.07)
-
-    def clearText(self):
-        for i, string in enumerate(self.text):
-            self.textObject[i].setText("")
 
     def updateTerrain(self, task):
         self.terrain.update()
@@ -222,7 +230,7 @@ class World(ABC):
 
         self.parent.setCameraPos(x, y, z)
 
-    def updateText(self, task):
+    def updateHUD(self, task):
         pos_str = "Plane Pos: " + self.strVector(self.plane.getPos())
         tanjent_str = "Tangent: " + self.strVector(self.plane.getT())
         normal_str = "Normal: " + self.strVector(self.plane.getN())
@@ -240,33 +248,20 @@ class World(ABC):
         return task.cont
 
     def drawCurve(self, x, y, z):
-        if self.line_np is not None:
-            self.line_np.detach_node()
+        self.lineAhead.removeAllChildren()
 
         self.prev_line.moveTo(x[0], y[0], z[0])
         self.prev_line.drawTo(x[1], y[1], z[1])
-        self.prev_line.setThickness(4)
 
         for i in range(len(x) - 1):
-            self.line.moveTo(x[i], y[i], z[i])
             self.line.drawTo(x[i + 1], y[i + 1], z[i + 1])
-            self.line.setThickness(4)
 
-        self.line_node = self.line.create()
-        self.line_np = NodePath(self.line_node)
-        self.line_np.reparentTo(render)
+        NodePath(self.line.create()).reparentTo(NodePath(self.lineAhead))
 
-        self.prev_node = self.prev_line.create()
-        self.prev_np.append(NodePath(self.prev_node))
-        self.prev_np[-1].reparentTo(render)
+        for i in range(len(x) - 1):
+            self.line.setVertexColor(i, 255, 255, 0, 1)
 
-    def clearCurve(self):
-        if self.prev_np is not None:
-            n = len(self.prev_np)
-            for _ in range(n):
-                self.prev_np.pop().detach_node()
-
-            self.prev_np.clear()
+        NodePath(self.prev_line.create()).reparentTo(NodePath(self.lineBehind))
 
     def updateCollisionDetection(self, task):
         plane_x, plane_y, plane_z = self.plane.getPos()
