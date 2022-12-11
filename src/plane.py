@@ -18,7 +18,6 @@ class Plane:
         planeBump = loader.loadTexture("models/plane/textures/piper_bump.jpg")
         planeRefl = loader.loadTexture("models/plane/textures/piper_refl.jpg")
         self.model.setTexture(planeTS, planeDiffuse)
-        self.model.reparentTo(render)
 
     def start(self, p0: Tuple[float, float, float],
               tangent: Tuple[float, float, float] = (0, 1, 0),

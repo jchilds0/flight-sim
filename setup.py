@@ -19,8 +19,7 @@ setup(
                 'terrain/**',
                 'ui/**',
                 'fonts/*.ttf',
-                'sounds/*.ogg',
-                'src/*.bam'
+                'sounds/*.ogg'
             ],
 
             # Platforms that we're building for.
