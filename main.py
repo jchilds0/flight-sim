@@ -13,6 +13,9 @@ class MyApp(ShowBase):
         self.sandbox = SandBox(self)
         self.tutorial1 = TutorialLevel1(self)
         self.menuObject = Menu(self)
+        self.mouseX = 1920 / 2
+        self.mouseY = 1080 / 2
+        base.disableMouse()
 
         self.keyMap = {
             "tor+": False,
@@ -21,7 +24,7 @@ class MyApp(ShowBase):
             "curv-": False,
             "tor0": False,
             "curv0": False,
-            "esc": False,
+            "esc": False
         }
 
         self.accept("w", self.updateKeyMap, ["tor+", True])
@@ -38,6 +41,7 @@ class MyApp(ShowBase):
         self.accept("e-up", self.updateKeyMap, ["tor0", False])
         self.accept("escape", self.updateKeyMap, ["esc", True])
         self.accept("escape-up", self.updateKeyMap, ["esc", False])
+        self.accept("mouse1", self.setMousePos)
 
         self.menu()
 
@@ -62,9 +66,13 @@ class MyApp(ShowBase):
     def setCameraPos(self, x, y, z):
         self.camera.setPos(x, y, z)
 
-    def lookAtCamera(self, obj):
-        self.camera.lookAt(obj)
+    def setCameraHpr(self, h, p, r):
+        self.camera.setHpr(h, p, r)
 
+    def setMousePos(self):
+        md = base.win.getPointer(0)
+        self.mouseX = md.getX()
+        self.mouseY = md.getY()
 
 app = MyApp()
 app.run()

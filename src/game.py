@@ -1,15 +1,13 @@
 from abc import ABC, abstractmethod
-from math import sin, cos, pi, fabs
-
-import numpy as np
+from math import pi
 from direct.gui.DirectGui import *
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import GeoMipTerrain, TextureStage, TexGenAttrib, PointLight, LineSegs, NodePath, PandaNode, \
     TextNode
-from typing import Tuple
-
+from pandac.PandaModules import MouseButton
 from src.curves import solve_frenet_serre, tangent_to_hpr
 from src.plane import Plane
+from src.rings import TorusCircle
 
 
 class World(ABC):
@@ -52,6 +50,14 @@ class World(ABC):
         self.floater = NodePath(PandaNode("floater"))
         self.floater.reparentTo(self.plane.model)
         self.floater.setZ(5)
+
+        # Mouse
+        self.x = 0
+        self.y = -15
+        self.prevx = 0
+        self.prevy = 0
+        self.prevtime = 0
+        self.hpr = (180, 90, 0)
 
         # Curve
         self.line = LineSegs()
@@ -102,15 +108,19 @@ class World(ABC):
         """ Add tasks to task manager """
         self.run()
         self.npHUD.reparentTo(aspect2d)
+
         taskMgr.add(self.updateCollisionDetection, "updateCol")
         taskMgr.add(self.updateCurvTor, "updatePos")
         taskMgr.add(self.updateHUD, "updateHUD")
+        taskMgr.add(self.updateCamera, "updateCam")
 
     def run(self):
         """ Reset variables to rerun the program """
         # Hide Gameover Screen
         if not self.gameOverScreen.isHidden():
             self.gameOverScreen.hide()
+
+        self.prevtime = 0
 
         # Initialise Plane
         self.plane.start(p0=(10, 40, 40))
@@ -125,6 +135,7 @@ class World(ABC):
         taskMgr.remove("updateCol")
         taskMgr.remove("updatePos")
         taskMgr.remove("updateHUD")
+        taskMgr.remove("updateCam")
 
     def clean(self):
         self.gameOverScreen.hide()
@@ -204,10 +215,13 @@ class World(ABC):
         self.plane.setN(sol[index, 6], sol[index, 7], sol[index, 8])
         self.plane.setB(sol[index, 9], sol[index, 10], sol[index, 11])
 
-        self.plane.setHpr(tangent_to_hpr(self.plane.getT(), self.plane.getN(), self.plane.getB()))
+        hpr = tangent_to_hpr(self.plane.getT(), self.plane.getN(), self.plane.getB())
+        self.plane.setHpr(hpr)
+        self.x += hpr[0] - self.hpr[0]
+        self.y += self.hpr[1] - hpr[1]
+        self.hpr = hpr
 
         self.camPos(20)
-        self.parent.lookAtCamera(self.floater)
 
         return task.cont
 
@@ -264,6 +278,20 @@ class World(ABC):
 
         return task.cont
 
+    def updateCamera(self, task):
+        if base.mouseWatcherNode.isButtonDown(MouseButton.one()):
+            md = base.win.getPointer(0)
+            self.x = 0.1 * (md.getX() - self.parent.mouseX) + self.prevx
+            self.y = 0.1 * (md.getY() - self.parent.mouseY) + self.prevy
+        else:
+            self.prevx = self.x
+            self.prevy = self.y
+
+        self.parent.setCameraHpr(self.x, self.y, 0)
+
+        self.prevtime = task.time
+        return task.cont
+
     @staticmethod
     def strVector(vector):
         digits = 2
@@ -317,98 +345,6 @@ class SandBox(World):
 
     def level(self):
         pass
-
-
-def unitVector(x, y):
-    """ Unit vector of x - y """
-    z = (
-        x[0] - y[0],
-        x[1] - y[1],
-        x[2] - y[2],
-    )
-
-    zHat = (z[0] ** 2 + z[1] ** 2 + z[2] ** 2) ** 0.5
-
-    return z[0] / zHat, z[1] / zHat, z[2] / zHat
-
-
-def rotateVector(pos, center, theta):
-    """ Rotate pos by theta radians about center """
-    x = pos[0] - center[0]
-    y = pos[1] - center[1]
-
-    rotX = cos(theta) * x - sin(theta) * y
-    rotY = sin(theta) * x + cos(theta) * y
-
-    return rotX + center[0], rotY + center[1], center[2]
-
-
-class TorusCircle:
-    """ Create a circle which is a slice of a Torus using LineSegs """
-
-    def __init__(self, theta: float, r1: float, c2: Tuple[float, float, float],
-                 r2: float, parent):
-        self.line = LineSegs()
-        self.ring = None
-        self.parent = parent
-        self.line.setThickness(20)
-        self.v = theta
-        self.radius = r1
-        self.outerCenter = c2
-        self.outerRadius = r2
-
-        self.draw()
-
-    def draw(self):
-        """ Torus Map: x(u,v)=((r cosu + a)cosv,(r cosu + a)sinv, r sinu) """
-        for u in np.arange(0, 2 * pi + 0.2, 0.05):
-            next_pos = (
-                (self.radius * cos(u) + self.outerRadius) * cos(self.v),
-                (self.radius * cos(u) + self.outerRadius) * sin(self.v),
-                self.radius * sin(u)
-            )
-            self.line.drawTo(next_pos[0] + self.outerCenter[0],
-                             next_pos[1] + self.outerCenter[1],
-                             next_pos[2] + self.outerCenter[2])
-
-        self.ring = self.line.create()
-        NodePath(self.ring).reparentTo(NodePath(self.parent))
-
-    def isInsideRing(self, pos: Tuple[float, float, float]):
-        """ Check if the point pos is contained in the interior of the ring """
-        dirVec = unitVector(pos, self.outerCenter)
-        ringVec = (cos(self.v), sin(self.v))
-
-        # Check if the angle to the centre point is the same
-        if fabs(dirVec[0] - ringVec[0]) > 0.01 or fabs(dirVec[1] - ringVec[1]) > 0.01:
-            return False
-
-        # Rotate pos
-        rotVec = rotateVector(pos, self.outerCenter, -self.v)
-
-        x = rotVec[0] - (self.outerCenter[0] + self.outerRadius)
-        z = rotVec[2] - self.outerCenter[2]
-
-        return (x ** 2 + z ** 2) <= self.radius ** 2
-
-    def setColor(self, num: int):
-        """
-        Set the color of a ring
-        :param num: 0 - White, 1 - Yellow, 2 - Green
-        :return: None
-        """
-        color = None
-        if num == 0:
-            color = (255, 255, 255, 1)
-        elif num == 1:
-            color = (255, 255, 0, 1)
-        elif num == 2:
-            color = (0, 255, 0, 1)
-        else:
-            pass
-
-        for i in range(self.line.getNumVertices()):
-            self.line.setVertexColor(i, color[0], color[1], color[2], color[3])
 
 
 class Tutorial(World, ABC):
@@ -598,4 +534,4 @@ class TutorialLevel1(Tutorial):
 
     def nextLevel(self):
         self.clean()
-        self.parent.tutorial2.start()
+        self.parent.menu()
