@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
-from collections import deque
+from math import sin, cos, pi, fabs
+
+import numpy as np
 from direct.gui.DirectGui import *
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import GeoMipTerrain, TextureStage, TexGenAttrib, PointLight, LineSegs, NodePath, PandaNode, \
     TextNode
+from typing import Tuple
 
 from src.curves import solve_frenet_serre, tangent_to_hpr
 from src.plane import Plane
@@ -15,6 +18,7 @@ class World(ABC):
 
     def __init__(self, parent):
         self.parent = parent
+        self.font = loader.loadFont("fonts/Wbxkomik.ttf")
 
         # Create Terrain
         self.terrain = GeoMipTerrain("myDynamicTerrain")
@@ -81,13 +85,6 @@ class World(ABC):
                                            frameTexture="ui/stoneFrame.png")
         self.gameoverScreenGenerate()
 
-        self.titleScreen = DirectDialog(frameSize=(-0.7, 0.7, -0.7, 0.7),
-                                        fadeScreen=0.4,
-                                        relief=DGG.FLAT,
-                                        frameTexture="ui/stoneFrame.png")
-        self.title = self.desc = self.titleBtn = None
-        self.titleScreenGenerate()
-
     @abstractmethod
     def start(self):
         """ Run the program """
@@ -115,11 +112,8 @@ class World(ABC):
         if not self.gameOverScreen.isHidden():
             self.gameOverScreen.hide()
 
-        if not self.titleScreen.isHidden():
-            self.titleScreen.hide()
-
         # Initialise Plane
-        self.plane.start(p0=(50, 50, 30))
+        self.plane.start(p0=(10, 40, 40))
 
         # Clear Lines
         self.lineAhead.removeAllChildren()
@@ -134,7 +128,6 @@ class World(ABC):
 
     def clean(self):
         self.gameOverScreen.hide()
-        self.titleScreen.hide()
         self.npHUD.detachNode()
         self.root.detachNode()
         self.sphere.detachNode()
@@ -146,11 +139,6 @@ class World(ABC):
     def menu(self):
         self.clean()
         self.parent.menu()
-
-    @abstractmethod
-    def level(self):
-        """ Handle passing between levels """
-        pass
 
     def terrainGenerate(self):
         self.terrain.setHeightfield("terrain/heightmap_2049.png")
@@ -284,15 +272,13 @@ class World(ABC):
             + ", " + str(round(vector[2], digits)) + ")"
 
     def gameoverScreenGenerate(self):
-        font = loader.loadFont("fonts/Wbxkomik.ttf")
-
         self.gameOverScreen.hide()
 
         title = DirectLabel(text="You Crashed!",
                             parent=self.gameOverScreen,
                             scale=0.1,
                             pos=(0, 0, 0.2),
-                            text_font=font,
+                            text_font=self.font,
                             relief=None)
 
         btn = DirectButton(text="Restart",
@@ -300,7 +286,7 @@ class World(ABC):
                            pos=(-0.3, 0, -0.2),
                            parent=self.gameOverScreen,
                            scale=0.07,
-                           text_font=font,
+                           text_font=self.font,
                            clickSound=loader.loadSfx("sounds/UIClick.ogg"),
                            frameTexture=self.buttonImages,
                            frameSize=(-4, 4, -1, 1),
@@ -314,7 +300,7 @@ class World(ABC):
                            pos=(0.3, 0, -0.2),
                            parent=self.gameOverScreen,
                            scale=0.07,
-                           text_font=font,
+                           text_font=self.font,
                            clickSound=loader.loadSfx("sounds/UIClick.ogg"),
                            frameTexture=self.buttonImages,
                            frameSize=(-4, 4, -1, 1),
@@ -323,31 +309,163 @@ class World(ABC):
                            text_pos=(0, -0.2))
         btn.setTransparency(True)
 
-    def titleScreenGenerate(self):
-        font = loader.loadFont("fonts/Wbxkomik.ttf")
 
+class SandBox(World):
+    def start(self):
+        self.drawModels()
+        self.startUpdaters()
+
+    def level(self):
+        pass
+
+
+def unitVector(x, y):
+    """ Unit vector of x - y """
+    z = (
+        x[0] - y[0],
+        x[1] - y[1],
+        x[2] - y[2],
+    )
+
+    zHat = (z[0] ** 2 + z[1] ** 2 + z[2] ** 2) ** 0.5
+
+    return z[0] / zHat, z[1] / zHat, z[2] / zHat
+
+
+def rotateVector(pos, center, theta):
+    """ Rotate pos by theta radians about center """
+    x = pos[0] - center[0]
+    y = pos[1] - center[1]
+
+    rotX = cos(theta) * x - sin(theta) * y
+    rotY = sin(theta) * x + cos(theta) * y
+
+    return rotX + center[0], rotY + center[1], center[2]
+
+
+class TorusCircle:
+    """ Create a circle which is a slice of a Torus using LineSegs """
+
+    def __init__(self, theta: float, r1: float, c2: Tuple[float, float, float],
+                 r2: float, parent):
+        self.line = LineSegs()
+        self.ring = None
+        self.parent = parent
+        self.line.setThickness(20)
+        self.v = theta
+        self.radius = r1
+        self.outerCenter = c2
+        self.outerRadius = r2
+
+        self.draw()
+
+    def draw(self):
+        """ Torus Map: x(u,v)=((r cosu + a)cosv,(r cosu + a)sinv, r sinu) """
+        for u in np.arange(0, 2 * pi + 0.2, 0.05):
+            next_pos = (
+                (self.radius * cos(u) + self.outerRadius) * cos(self.v),
+                (self.radius * cos(u) + self.outerRadius) * sin(self.v),
+                self.radius * sin(u)
+            )
+            self.line.drawTo(next_pos[0] + self.outerCenter[0],
+                             next_pos[1] + self.outerCenter[1],
+                             next_pos[2] + self.outerCenter[2])
+
+        self.ring = self.line.create()
+        NodePath(self.ring).reparentTo(NodePath(self.parent))
+
+    def isInsideRing(self, pos: Tuple[float, float, float]):
+        """ Check if the point pos is contained in the interior of the ring """
+        dirVec = unitVector(pos, self.outerCenter)
+        ringVec = (cos(self.v), sin(self.v))
+
+        # Check if the angle to the centre point is the same
+        if fabs(dirVec[0] - ringVec[0]) > 0.01 or fabs(dirVec[1] - ringVec[1]) > 0.01:
+            return False
+
+        # Rotate pos
+        rotVec = rotateVector(pos, self.outerCenter, -self.v)
+
+        x = rotVec[0] - (self.outerCenter[0] + self.outerRadius)
+        z = rotVec[2] - self.outerCenter[2]
+
+        return (x ** 2 + z ** 2) <= self.radius ** 2
+
+    def setColor(self, num: int):
+        """
+        Set the color of a ring
+        :param num: 0 - White, 1 - Yellow, 2 - Green
+        :return: None
+        """
+        color = None
+        if num == 0:
+            color = (255, 255, 255, 1)
+        elif num == 1:
+            color = (255, 255, 0, 1)
+        elif num == 2:
+            color = (0, 255, 0, 1)
+        else:
+            pass
+
+        for i in range(self.line.getNumVertices()):
+            self.line.setVertexColor(i, color[0], color[1], color[2], color[3])
+
+
+class Tutorial(World, ABC):
+    def __init__(self, parent):
+        super().__init__(parent)
+
+        self.titleScreen = DirectDialog(frameSize=(-0.7, 0.7, -0.7, 0.7),
+                                        fadeScreen=0.4,
+                                        relief=DGG.FLAT,
+                                        frameTexture="ui/stoneFrame.png")
+        self.title = self.desc = self.titleBtn = None
+        self.titleScreenGenerate()
+
+        self.levelCompleteScreen = DirectDialog(frameSize=(-0.7, 0.7, -0.7, 0.7),
+                                                fadeScreen=0.4,
+                                                relief=DGG.FLAT,
+                                                frameTexture="ui/stoneFrame.png")
+        self.levelCompleteScreenGenerate()
+
+        self.levelLineNode = PandaNode('levelLineNode')
+        NodePath(self.levelLineNode).reparentTo(NodePath(self.curves))
+
+    @abstractmethod
+    def levelStart(self):
+        pass
+
+    @abstractmethod
+    def levelComplete(self):
+        pass
+
+    @abstractmethod
+    def nextLevel(self):
+        pass
+
+    def titleScreenGenerate(self):
         self.titleScreen.hide()
 
         self.title = DirectLabel(text="",
                                  parent=self.titleScreen,
                                  scale=0.1,
                                  pos=(0, 0, 0.2),
-                                 text_font=font,
+                                 text_font=self.font,
                                  relief=None)
 
-        self.desc = DirectLabel(text="This is a description",
+        self.desc = DirectLabel(text="",
                                 parent=self.titleScreen,
                                 scale=0.05,
                                 pos=(0, 0, 0),
-                                text_font=font,
+                                text_font=self.font,
                                 relief=None)
 
         self.titleBtn = DirectButton(text="Start",
-                                     command=self.level,
+                                     command=self.levelStart,
                                      pos=(-0.3, 0, -0.2),
                                      parent=self.titleScreen,
                                      scale=0.07,
-                                     text_font=font,
+                                     text_font=self.font,
                                      clickSound=loader.loadSfx("sounds/UIClick.ogg"),
                                      frameTexture=self.buttonImages,
                                      frameSize=(-4, 4, -1, 1),
@@ -361,7 +479,7 @@ class World(ABC):
                            pos=(0.3, 0, -0.2),
                            parent=self.titleScreen,
                            scale=0.07,
-                           text_font=font,
+                           text_font=self.font,
                            clickSound=loader.loadSfx("sounds/UIClick.ogg"),
                            frameTexture=self.buttonImages,
                            frameSize=(-4, 4, -1, 1),
@@ -370,35 +488,114 @@ class World(ABC):
                            text_pos=(0, -0.2))
         btn.setTransparency(True)
 
-    def setTitle(self, text: str):
-        self.title.setText(text)
+    def levelCompleteScreenGenerate(self):
+        self.levelCompleteScreen.hide()
+
+        title = DirectLabel(text="Level Complete!",
+                            parent=self.levelCompleteScreen,
+                            scale=0.1,
+                            pos=(0, 0, 0.2),
+                            text_font=self.font,
+                            relief=None)
+
+        btn = DirectButton(text="Next Level",
+                           command=self.nextLevel,
+                           pos=(-0.3, 0, -0.2),
+                           parent=self.levelCompleteScreen,
+                           scale=0.07,
+                           text_font=self.font,
+                           clickSound=loader.loadSfx("sounds/UIClick.ogg"),
+                           frameTexture=self.buttonImages,
+                           frameSize=(-4, 4, -1, 1),
+                           text_scale=0.75,
+                           relief=DGG.FLAT,
+                           text_pos=(0, -0.2))
+        btn.setTransparency(True)
+
+        btn = DirectButton(text="Menu",
+                           command=self.menu,
+                           pos=(0.3, 0, -0.2),
+                           parent=self.levelCompleteScreen,
+                           scale=0.07,
+                           text_font=self.font,
+                           clickSound=loader.loadSfx("sounds/UIClick.ogg"),
+                           frameTexture=self.buttonImages,
+                           frameSize=(-4, 4, -1, 1),
+                           text_scale=0.75,
+                           relief=DGG.FLAT,
+                           text_pos=(0, -0.2))
+        btn.setTransparency(True)
 
 
-class SandBox(World):
-    def start(self):
-        self.drawModels()
-        self.startUpdaters()
-
-    def level(self):
-        pass
-
-
-class Tutorial(World):
+class TutorialLevel1(Tutorial):
     def __init__(self, parent):
-        World.__init__(self, parent)
-
-        self.levelNum = 0
-
-        self.levelText = [
-            "Level 0: Circles",
-            "",
-        ]
+        super().__init__(parent)
+        self.ring = None
+        self.ringLines = []
 
     def start(self):
         self.drawModels()
-        self.setTitle(self.levelText[0])
+        self.title.setText("Level 1: Circles")
+        self.desc.setText("Set a positive curvature to make a circle")
         self.titleScreen.show()
 
-    def level(self):
-        if self.levelNum == 0:
-            self.startUpdaters()
+    def run(self):
+        super().run()
+
+        self.ring = 0
+
+        self.ringLines[0].setColor(1)
+        for ring in self.ringLines[1:]:
+            ring.setColor(0)
+
+    def clean(self):
+        self.titleScreen.hide()
+        self.levelCompleteScreen.hide()
+        self.levelLineNode.removeAllChildren()
+        super().clean()
+
+    def levelStart(self):
+        if not self.titleScreen.isHidden():
+            self.titleScreen.hide()
+
+        # Draw Circles + Color them
+        self.drawCircles()
+        # Start Game Updaters
+        taskMgr.add(self.updateLevel, "level")
+        self.startUpdaters()
+
+    def updateLevel(self, task):
+        if self.ringLines[self.ring].isInsideRing(self.plane.getPos()):
+            self.ringLines[self.ring].setColor(2)
+            self.ring += 1
+
+            # Check if all rings have been completed
+            if self.ring == len(self.ringLines):
+                taskMgr.remove("level")
+                self.levelComplete()
+            else:
+                self.ringLines[self.ring].setColor(1)
+
+        return task.cont
+
+    def drawCircles(self):
+        outerCenter, outerRadius = (110, 110, 40), 100
+        numSegs = 12
+
+        angles = [pi - 2 * pi * i / numSegs for i in range(numSegs - 3)]
+
+        innerRadius = 10
+        self.ringLines = [TorusCircle(theta, innerRadius, outerCenter, outerRadius, self.levelLineNode) for theta in
+                          angles]
+        self.ringLines[0].setColor(1)
+        self.ring = 0
+
+    def levelComplete(self):
+        self.plane.setT(0, 0, 0)
+        self.plane.setN(0, 0, 0)
+        self.plane.setB(0, 0, 0)
+        self.levelCompleteScreen.show()
+
+    def nextLevel(self):
+        self.clean()
+        self.parent.tutorial2.start()

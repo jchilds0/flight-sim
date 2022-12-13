@@ -1,7 +1,7 @@
 from direct.showbase.ShowBase import ShowBase
-from panda3d.core import TextNode, WindowProperties
+from panda3d.core import WindowProperties
 
-from src.game import SandBox, Tutorial
+from src.game import SandBox, TutorialLevel1
 from src.menu import Menu
 
 
@@ -11,7 +11,7 @@ class MyApp(ShowBase):
 
         self.props = WindowProperties()
         self.sandbox = SandBox(self)
-        self.tutorial = Tutorial(self)
+        self.tutorial1 = TutorialLevel1(self)
         self.menuObject = Menu(self)
 
         self.keyMap = {
@@ -47,7 +47,7 @@ class MyApp(ShowBase):
 
     def startTutorial(self):
         self.menuObject.clean()
-        self.tutorial.start()
+        self.tutorial1.start()
 
     def menu(self):
         self.menuObject.showHome()
