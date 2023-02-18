@@ -19,8 +19,7 @@ class World(ABC):
         self.font = loader.loadFont("fonts/Wbxkomik.ttf")
 
         # Create Terrain
-        self.terrain = GeoMipTerrain("mySimpleTerrain")
-        self.terrainRoot = self.terrain.getRoot()
+        self.terrain = NodePath(PandaNode("terrain"))
         self.terrainGenerate()
 
         # Skybox
@@ -42,7 +41,7 @@ class World(ABC):
             np.setPos(-1.7, 0, -0.4 - i / 10)
             np.setScale(0.07)
             self.nodeHUD.addChild(node)
-            node.setTextColor(255, 255, 255, 1)
+            node.setTextColor(0, 0, 0, 1)
 
         # Floater for camera
         self.floater = NodePath(PandaNode("floater"))
@@ -97,7 +96,7 @@ class World(ABC):
     def drawModels(self):
         """ Draw all models and initialise cameras"""
         self.parent.setWindowSize(1920, 1080)
-        self.terrainRoot.reparentTo(render)
+        self.terrain.reparentTo(render)
         self.sphere.reparentTo(render)
         self.plane.model.reparentTo(render)
         NodePath(self.curves).reparentTo(render)
@@ -138,7 +137,7 @@ class World(ABC):
     def clean(self):
         self.gameOverScreen.hide()
         self.npHUD.detachNode()
-        self.terrainRoot.detachNode()
+        self.terrain.detachNode()
         self.sphere.detachNode()
         self.plane.model.detachNode()
         NodePath(self.curves).detachNode()
@@ -150,16 +149,24 @@ class World(ABC):
         self.parent.menu()
 
     def terrainGenerate(self):
-        self.terrain.setHeightfield("models/terrain/black.gif")
+        """ Generate Terrain """
+        texture = loader.loadTexture('models/terrain/grid2.jpg')
+        size = 2
+        scale = 1
 
-        self.terrainRoot.setSx(1)
-        self.terrainRoot.setSy(1)
-        #self.terrainRoot.setPos(0, 0, 0)
-        self.terrain.generate()
+        for i in range(-size, size):
+            for j in range(-size, size):
+                x, y = 256 * i * scale, 256 * j * scale
+                terrain = GeoMipTerrain("mySimpleTerrain")
+                terrainRoot = terrain.getRoot()
+                terrainRoot.reparentTo(self.terrain)
+                terrain.setHeightfield("models/terrain/black.gif")
+                terrainRoot.setTexture(texture)
 
-        # texture terrain
-        texture = loader.loadTexture('models/terrain/grid.jpg')
-        self.terrainRoot.setTexture(texture)
+                terrainRoot.setSx(scale)
+                terrainRoot.setSy(scale)
+                terrainRoot.setPos(x, y, 0)
+                terrain.generate()
 
     def skyboxGenerate(self):
         # Load a sphere with a radius of 1 unit and the faces directed inward.
