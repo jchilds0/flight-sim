@@ -3,7 +3,7 @@ from math import pi
 from direct.gui.DirectGui import *
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import GeoMipTerrain, TextureStage, TexGenAttrib, PointLight, LineSegs, NodePath, PandaNode, \
-    TextNode, Geom, GeomVertexFormat, GeomVertexData, GeomVertexWriter, GeomTriangles, GeomNode
+    TextNode
 from pandac.PandaModules import MouseButton
 from src.curves import solve_frenet_serre, tangent_to_hpr
 from src.plane import Plane
@@ -19,9 +19,8 @@ class World(ABC):
         self.font = loader.loadFont("fonts/Wbxkomik.ttf")
 
         # Create Terrain
-        self.terrain = GeoMipTerrain("myDynamicTerrain")
-        self.root = self.terrain.getRoot()
-
+        self.terrain = GeoMipTerrain("mySimpleTerrain")
+        self.terrainRoot = self.terrain.getRoot()
         self.terrainGenerate()
 
         # Skybox
@@ -98,7 +97,7 @@ class World(ABC):
     def drawModels(self):
         """ Draw all models and initialise cameras"""
         self.parent.setWindowSize(1920, 1080)
-        self.root.reparentTo(render)
+        self.terrainRoot.reparentTo(render)
         self.sphere.reparentTo(render)
         self.plane.model.reparentTo(render)
         NodePath(self.curves).reparentTo(render)
@@ -139,7 +138,7 @@ class World(ABC):
     def clean(self):
         self.gameOverScreen.hide()
         self.npHUD.detachNode()
-        self.root.detachNode()
+        self.terrainRoot.detachNode()
         self.sphere.detachNode()
         self.plane.model.detachNode()
         NodePath(self.curves).detachNode()
@@ -151,24 +150,16 @@ class World(ABC):
         self.parent.menu()
 
     def terrainGenerate(self):
-        self.terrain.setHeightfield("terrain/heightmap_2049.png")
+        self.terrain.setHeightfield("models/terrain/black.gif")
 
-        # Set terrain properties
-        self.terrain.setBlockSize(1024)
-        # self.terrain.setNear(40)
-        # self.terrain.setFar(1000)
-        # self.terrain.setFocalPoint(base.camera)
-
-        # Store the root NodePath for convenience
-        terrainNormal = loader.loadTexture("terrain/base_color_darker_2049.png")
-        self.root.setTexture(terrainNormal)
-        self.root.setSz(75)
-        self.root.setSx(0.1)
-        self.root.setSy(0.1)
-
-        # Generate it.
+        self.terrainRoot.setSx(1)
+        self.terrainRoot.setSy(1)
+        #self.terrainRoot.setPos(0, 0, 0)
         self.terrain.generate()
-        # taskMgr.add(self.updateTerrain, "updateTer")
+
+        # texture terrain
+        texture = loader.loadTexture('models/terrain/grid.jpg')
+        self.terrainRoot.setTexture(texture)
 
     def skyboxGenerate(self):
         # Load a sphere with a radius of 1 unit and the faces directed inward.
@@ -182,10 +173,6 @@ class World(ABC):
         self.sphere.setLightOff()
         self.sphere.setScale(1000)
         self.sphere.setHpr(0, -90, 0)
-
-    def updateTerrain(self, task):
-        self.terrain.update()
-        return task.cont
 
     def updateCurvTor(self, task):
         """ Movement bases on curvature and torsion """
@@ -268,7 +255,7 @@ class World(ABC):
     def updateCollisionDetection(self, task):
         plane_x, plane_y, plane_z = self.plane.getPos()
 
-        if plane_z <= self.root.getSz() * self.terrain.getElevation(plane_x, plane_y):
+        if plane_z <= 0:
             self.plane.setT(0, 0, 0)
             self.plane.setN(0, 0, 0)
             self.plane.setB(0, 0, 0)
