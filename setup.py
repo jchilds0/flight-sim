@@ -16,7 +16,6 @@ setup(
             # Specify which files are included with the distribution
             'include_patterns': [
                 'models/**',
-                'terrain/**',
                 'ui/**',
                 'fonts/*.ttf',
                 'sounds/*.ogg'
@@ -24,9 +23,9 @@ setup(
 
             # Platforms that we're building for.
             'platforms': [
+                "win_amd64",
                 "manylinux1_x86_64",
                 "macosx_10_6_x86_64",
-                "win_amd64"
             ],
 
             # Include the OpenGL renderer and OpenAL audio plug-in
