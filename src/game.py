@@ -3,7 +3,7 @@ from math import pi
 from direct.gui.DirectGui import *
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import GeoMipTerrain, TextureStage, TexGenAttrib, PointLight, LineSegs, NodePath, PandaNode, \
-    TextNode
+    TextNode, Geom, GeomVertexFormat, GeomVertexData, GeomVertexWriter, GeomTriangles, GeomNode
 from pandac.PandaModules import MouseButton
 from src.curves import solve_frenet_serre, tangent_to_hpr
 from src.plane import Plane
@@ -26,7 +26,6 @@ class World(ABC):
 
         # Skybox
         self.sphere = loader.loadModel("models/skysphere/InvertedSphere.egg")
-
         self.skyboxGenerate()
 
         # Plane
@@ -178,10 +177,11 @@ class World(ABC):
         self.sphere.setTexPos(TextureStage.getDefault(), 0, 0, 0)
         self.sphere.setTexScale(TextureStage.getDefault(), .5)
 
-        tex = loader.loadCubeMap("models/skysphere/BlueGreenNebula_#.png")
+        tex = loader.loadCubeMap("models/skybox/skybox_#.jpg")
         self.sphere.setTexture(tex)
         self.sphere.setLightOff()
         self.sphere.setScale(1000)
+        self.sphere.setHpr(0, -90, 0)
 
     def updateTerrain(self, task):
         self.terrain.update()
